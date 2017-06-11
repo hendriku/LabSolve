@@ -162,23 +162,36 @@ bool isGoal(Lab* pLab, int x, int y) {
 	return *(pLab->fields + pLab->yMax * y + x) == 'X';
 }
 
+void setVisited(Lab* pLab, int x, int y) {
+	*(pLab->fields + y * pLab->yMax + x) = '.';
+}
+
+Field* isNextToGoal(Lab* pLab, Field* moves) {
+	Field* temp;
+	for (int i = 0; i < 8; i++) {
+		temp = (moves + i);
+		if (isGoal(pLab, temp->x, temp->y)) {
+			return temp;
+		}
+	}
+	return 0;
+}
+
 Field* getFieldToTarget(Lab* pLab, int currX, int currY) {
 	Field* moves = getMoves(pLab, currX, currY);
-	Field* temp;
+	Field* temp = isNextToGoal(pLab, moves);
 
-	*(pLab->fields + currY * pLab->yMax + currX) = '.';
-	usleep(100000);
+	setVisited(pLab, currX, currY);
+	usleep(20000);
 	rewindOutputField(pLab);
 	printOutputField(pLab);
 
+	if (temp) return temp;
+
 	for (int i = 0; i < 8; i++) {
 		temp = (moves + i);
-		if (exists(pLab, temp->x, temp->y)) {
-			if (isAvailable(pLab, temp->x, temp->y)) {
-				if (getFieldToTarget(pLab, temp->x, temp->y)) {
-					return temp;
-				}
-			} else if (isGoal(pLab, temp->x, temp->y)) {
+		if (exists(pLab, temp->x, temp->y) && isAvailable(pLab, temp->x, temp->y)) {
+			if (getFieldToTarget(pLab, temp->x, temp->y)) {
 				return temp;
 			}
 		}
@@ -207,4 +220,5 @@ Lab* LabSolve(Lab* pLab) {
 	free(startField);
 	return pLab;
 }
+
 
