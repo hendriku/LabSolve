@@ -43,6 +43,7 @@ int main(int argc, char* argv[]) {
 
 	free(pLab->fields);
 	fclose(in);
+	return EXIT_SUCCESS;
 }
 
 int getLabWidth(FILE* pFile) {
@@ -109,9 +110,8 @@ Field* getStartField(Lab* pLab) {
 			}
 		}
 	}
-	field->x = -1;
-	field->y = -1;
-	return field;
+	perror("Error: Unable to find start field 'S'.\n");
+	exit(EXIT_FAILURE);
 }
 
 Lab* LabRead(FILE* file) {
