@@ -3,9 +3,11 @@
 #include <stdbool.h>
 #include <unistd.h>
 #define MAX_SIZE 50
+#define INFINITY 1000000000
+#define DELAY 20000
 
 typedef struct {
-	int x, y;
+	int x, y, value;
 } Field;
 
 typedef struct {
@@ -17,7 +19,7 @@ typedef struct {
 Lab* LabRead(FILE*);
 Lab* LabSolve(Lab*);
 Field* getStartField(Lab*);
-Field* getFieldToTarget(Lab*, int, int);
+Field* escape(Lab*, int, int);
 int getLabWidth(FILE*);
 int getLabHeight(FILE*);
 void initField(Lab*);
@@ -171,18 +173,83 @@ Field* isNextToGoal(Lab* pLab, Field* moves) {
 	for (int i = 0; i < 8; i++) {
 		temp = (moves + i);
 		if (isGoal(pLab, temp->x, temp->y)) {
+			temp->value = 1;
 			return temp;
 		}
 	}
 	return 0;
 }
 
-Field* getFieldToTarget(Lab* pLab, int currX, int currY) {
+Field* dummyMove() {
+	Field* d = malloc(sizeof(Field));
+	d->x = -2;
+	d->y = -2;
+	d->value = INFINITY;
+	return d;
+}
+
+Field* cloneMove(Field* src) {
+	Field* result = malloc(sizeof(Field));
+	result->x = src->x;
+	result->y = src->y;
+	result->value = src->value;
+	return result;
+}
+
+Field* findBestWay(Lab* pLab, int currX, int currY) {
+	// printf("ESCAPE\n");
+	Field *moves = getMoves(pLab, currX, currY),
+		  *temp = isNextToGoal(pLab, moves),
+		  *nextTemp,
+		  *min = dummyMove();
+	// printf("Initialized\n");
+
+	// printf("Setting visited: %d|%d\n", currX, currY);
+	setVisited(pLab, currX, currY);
+	usleep(DELAY);
+	rewindOutputField(pLab);
+	printOutputField(pLab);
+	// printf("Printed.\n");
+	// printf("temp(goal) = %p\n", temp);
+
+	if (temp) {
+		//printf("SOLOUTION RETURN\n");
+		min = cloneMove(temp);
+		free(moves);
+		return min;
+	}
+
+	for (int i = 0; i < 8; i++) {
+		temp = (moves + i);
+		//printf("temp=%d|%d\n", temp->x, temp->y);
+		if (exists(pLab, temp->x, temp->y) && isAvailable(pLab, temp->x, temp->y)) {
+			nextTemp = findBestWay(pLab, temp->x, temp->y);
+			// printf("nextTemp received\n");
+			if (nextTemp && nextTemp->value < min->value) {
+				temp->value = nextTemp->value;
+				min = temp;
+			}
+			// printf("Check done. Freeing %p...\n", nextTemp);
+			free(nextTemp);
+			// printf("Freed\n");
+		}
+	}
+	// printf("Returning best\n");
+
+	Field* clone = cloneMove(min);
+	clone->value++;
+
+	free(moves);
+
+	return clone;
+}
+
+Field* escape(Lab* pLab, int currX, int currY) {
 	Field* moves = getMoves(pLab, currX, currY);
 	Field* temp = isNextToGoal(pLab, moves);
 
 	setVisited(pLab, currX, currY);
-	usleep(20000);
+	usleep(DELAY);
 	rewindOutputField(pLab);
 	printOutputField(pLab);
 
@@ -191,7 +258,7 @@ Field* getFieldToTarget(Lab* pLab, int currX, int currY) {
 	for (int i = 0; i < 8; i++) {
 		temp = (moves + i);
 		if (exists(pLab, temp->x, temp->y) && isAvailable(pLab, temp->x, temp->y)) {
-			if (getFieldToTarget(pLab, temp->x, temp->y)) {
+			if (escape(pLab, temp->x, temp->y)) {
 				return temp;
 			}
 		}
@@ -213,12 +280,12 @@ Lab* LabSolve(Lab* pLab) {
 	while (getchar() != '\n')
 		;
 	printf("\n");
-	if (getFieldToTarget(pLab, startField->x, startField->y))
-		printf("Solved.\n");
+	Field* result = findBestWay(pLab, startField->x, startField->y);
+	if (result)
+		printf("Solved. Best way is %d steps.\n", result->value);
 	else
 		printf("Impossible.\n");
 	free(startField);
 	return pLab;
 }
-
 
