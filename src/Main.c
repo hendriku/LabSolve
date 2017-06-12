@@ -4,7 +4,10 @@
 #include <unistd.h>
 #define MAX_SIZE 50
 #define INFINITY 1000000000
-#define DELAY 20000
+#define DELAY 0
+#define MOVE_SIZE 4
+#define SHOW_PATH true
+#define GREEDY true
 
 typedef struct {
 	int x, y, value;
@@ -24,6 +27,8 @@ int getLabWidth(FILE*);
 int getLabHeight(FILE*);
 void initField(Lab*);
 void printOutputField(Lab*);
+void setEvaluated(Lab*, int, int, int);
+void setEvaluatedChar(Lab*, int, int, char);
 
 int main(int argc, char* argv[]) {
 	FILE* in = stdin;
@@ -140,11 +145,12 @@ Lab* LabRead(FILE* file) {
 }
 
 Field* getMoves(Lab* pLab, int currX, int currY) {
-	Field* fields = malloc(sizeof(Field) * 8);
+	Field* fields = malloc(sizeof(Field) * MOVE_SIZE);
 	Field* temp;
-	int xShift[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
-	int yShift[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
-	for (int i = 0; i < 8; i++) {
+	// Not diagonally
+	int xShift[] = { 0, -1, 1, 0 };
+	int yShift[] = { -1, 0, 0, 1 };
+	for (int i = 0; i < MOVE_SIZE; i++) {
 		temp = fields + i;
 		temp->x = currX + xShift[i];
 		temp->y = currY + yShift[i];
@@ -168,9 +174,21 @@ void setVisited(Lab* pLab, int x, int y) {
 	*(pLab->fields + y * pLab->yMax + x) = '.';
 }
 
+void setUnvisited(Lab* pLab, int x, int y) {
+	*(pLab->fields + y * pLab->yMax + x) = ' ';
+}
+
+void setEvaluatedChar(Lab* pLab, int x, int y, char value) {
+	*(pLab->fields + y * pLab->yMax + x) = value;
+}
+
+void setEvaluated(Lab* pLab, int x, int y, int value) {
+	*(pLab->fields + y * pLab->yMax + x) = value + '0';
+}
+
 Field* isNextToGoal(Lab* pLab, Field* moves) {
 	Field* temp;
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < MOVE_SIZE; i++) {
 		temp = (moves + i);
 		if (isGoal(pLab, temp->x, temp->y)) {
 			temp->value = 1;
@@ -196,51 +214,79 @@ Field* cloneMove(Field* src) {
 	return result;
 }
 
-Field* findBestWay(Lab* pLab, int currX, int currY) {
-	// printf("ESCAPE\n");
-	Field *moves = getMoves(pLab, currX, currY),
-		  *temp = isNextToGoal(pLab, moves),
-		  *nextTemp,
-		  *min = dummyMove();
-	// printf("Initialized\n");
+Field* findGoodWay(Lab* pLab, int currX, int currY) {
+	Field *moves = getMoves(pLab, currX, currY), *temp = isNextToGoal(pLab,
+			moves), *nextTemp, *min = dummyMove();
 
-	// printf("Setting visited: %d|%d\n", currX, currY);
 	setVisited(pLab, currX, currY);
 	usleep(DELAY);
-	rewindOutputField(pLab);
-	printOutputField(pLab);
-	// printf("Printed.\n");
-	// printf("temp(goal) = %p\n", temp);
+	if (SHOW_PATH) {
+		rewindOutputField(pLab);
+		printOutputField(pLab);
+	}
 
 	if (temp) {
-		//printf("SOLOUTION RETURN\n");
 		min = cloneMove(temp);
 		free(moves);
 		return min;
 	}
 
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < MOVE_SIZE; i++) {
 		temp = (moves + i);
-		//printf("temp=%d|%d\n", temp->x, temp->y);
-		if (exists(pLab, temp->x, temp->y) && isAvailable(pLab, temp->x, temp->y)) {
-			nextTemp = findBestWay(pLab, temp->x, temp->y);
-			// printf("nextTemp received\n");
+		if (exists(pLab, temp->x, temp->y)
+				&& isAvailable(pLab, temp->x, temp->y)) {
+			nextTemp = findGoodWay(pLab, temp->x, temp->y);
 			if (nextTemp && nextTemp->value < min->value) {
 				temp->value = nextTemp->value;
 				min = temp;
 			}
-			// printf("Check done. Freeing %p...\n", nextTemp);
 			free(nextTemp);
-			// printf("Freed\n");
 		}
 	}
-	// printf("Returning best\n");
 
 	Field* clone = cloneMove(min);
+	setEvaluatedChar(pLab, clone->x, clone->y, '+');
 	clone->value++;
-
 	free(moves);
+	return clone;
+}
 
+Field* findBestWay(Lab* pLab, int currX, int currY) {
+	Field *moves = getMoves(pLab, currX, currY), *temp = isNextToGoal(pLab,
+			moves), *nextTemp, *min = dummyMove();
+
+	setVisited(pLab, currX, currY);
+	usleep(DELAY);
+	if (SHOW_PATH) {
+		rewindOutputField(pLab);
+		printOutputField(pLab);
+	}
+
+	if (temp) {
+		min = cloneMove(temp);
+		setUnvisited(pLab, currX, currY);
+		free(moves);
+		return min;
+	}
+
+	for (int i = 0; i < MOVE_SIZE; i++) {
+		temp = (moves + i);
+		if (exists(pLab, temp->x, temp->y)
+				&& isAvailable(pLab, temp->x, temp->y)) {
+			nextTemp = findBestWay(pLab, temp->x, temp->y);
+			if (nextTemp && nextTemp->value < min->value) {
+				temp->value = nextTemp->value;
+				min = temp;
+			}
+			free(nextTemp);
+		}
+	}
+
+	Field* clone = cloneMove(min);
+
+	clone->value++;
+	setUnvisited(pLab, currX, currY);
+	free(moves);
 	return clone;
 }
 
@@ -250,14 +296,18 @@ Field* escape(Lab* pLab, int currX, int currY) {
 
 	setVisited(pLab, currX, currY);
 	usleep(DELAY);
-	rewindOutputField(pLab);
-	printOutputField(pLab);
+	if(SHOW_PATH) {
+		rewindOutputField(pLab);
+		printOutputField(pLab);
+	}
 
-	if (temp) return temp;
+	if (temp)
+		return temp;
 
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < MOVE_SIZE; i++) {
 		temp = (moves + i);
-		if (exists(pLab, temp->x, temp->y) && isAvailable(pLab, temp->x, temp->y)) {
+		if (exists(pLab, temp->x, temp->y)
+				&& isAvailable(pLab, temp->x, temp->y)) {
 			if (escape(pLab, temp->x, temp->y)) {
 				return temp;
 			}
@@ -280,7 +330,7 @@ Lab* LabSolve(Lab* pLab) {
 	while (getchar() != '\n')
 		;
 	printf("\n");
-	Field* result = findBestWay(pLab, startField->x, startField->y);
+	Field* result = findGoodWay(pLab, startField->x, startField->y);
 	if (result)
 		printf("Solved. Best way is %d steps.\n", result->value);
 	else
