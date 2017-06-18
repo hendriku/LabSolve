@@ -25,9 +25,9 @@ typedef struct {
 } Lab;
 
 Lab* LabRead(FILE*);
-Lab* LabSolve(Lab*, int);
+int LabSolve(Lab*, int);
 Field* getStartField(Lab*);
-Field* escape(Lab*, int, int);
+int escape(Lab*, int, int);
 Field* greedy(Lab*, int, int);
 int bfs(Lab*, Field*);
 int getLabWidth(FILE*);
@@ -36,14 +36,17 @@ void initField(Lab*);
 void printOutputField(Lab*);
 void rewindOutputField();
 void setEvaluated(Lab*, int, int, int);
-void setChar(Lab*, int, int, char);
+void setField(Lab*, int, int, char);
+bool isFree(Lab*, int, int);
+bool exists(Lab*, int, int);
+char getField(Lab*, int, int);
 
 QueueElement *first_q, *last_q;
 
 int main(int argc, char* argv[]) {
 	FILE* in = stdin;
 	Lab* pLab = NULL;
-	int search;
+	int search, result;
 	if (argc != 3) {
 		fprintf(stderr, "Usage: %s [<file>] [<search>]"
 				"\nSearches:"
@@ -55,7 +58,7 @@ int main(int argc, char* argv[]) {
 		in = fopen(argv[1], "r");
 		if (!in) {
 			perror(argv[1]);
-			return 1;
+			return -1;
 		}
 
 		if (!strcmp(argv[2], "-escape")) {
@@ -66,16 +69,16 @@ int main(int argc, char* argv[]) {
 			search = 2;
 		} else {
 			printf("Unknown search %s", argv[2]);
-			return 1;
+			return -1;
 		}
 	}
 	pLab = LabRead(in);
 
-	pLab = LabSolve(pLab, search);
+	result = LabSolve(pLab, search);
 
 	free(pLab->fields);
 	fclose(in);
-	return EXIT_SUCCESS;
+	return result;
 }
 
 void enqueue(QueueElement* el) {
@@ -134,7 +137,7 @@ void initField(Lab* pLab) {
 }
 
 void rewindOutputField() {
-	printf("\033[5;1H");
+	printf("\033[2;1H");
 }
 
 void printOutputField(Lab* pLab) {
@@ -167,11 +170,11 @@ Field* getStartField(Lab* pLab) {
 }
 
 Lab* LabRead(FILE* file) {
-	printf("Reading lab...\n");
+	//printf("Reading lab...\n");
 	Lab* pLab = malloc(sizeof(Lab));
 	pLab->xMax = getLabWidth(file);
 	pLab->yMax = getLabHeight(file);
-	printf("Dimensions are %d x %d.\n", pLab->xMax, pLab->yMax);
+	//printf("Dimensions are %d x %d.\n", pLab->xMax, pLab->yMax);
 	pLab->fields = malloc(sizeof(char) * pLab->xMax * pLab->yMax);
 	char temp;
 	int x = 0, y = 0;
@@ -190,8 +193,8 @@ Lab* LabRead(FILE* file) {
 }
 
 Field* getMoves(Lab* pLab, int currX, int currY) {
-	Field* fields = malloc(sizeof(Field) * MOVE_SIZE);
-	Field* temp = NULL;
+	Field* fields = calloc(MOVE_SIZE, sizeof(Field)), *temp;
+
 	// Not diagonal
 	int xShift[] = { 0, -1, 1, 0 };
 	int yShift[] = { -1, 0, 0, 1 };
@@ -199,10 +202,9 @@ Field* getMoves(Lab* pLab, int currX, int currY) {
 	for (int i = 0; i < MOVE_SIZE; i++) {
 		x = currX + xShift[i];
 		y = currY + yShift[i];
-		if (x > 0 && y > 0 && x < pLab->xMax && y < pLab->yMax
-				&& pLab->fields[pLab->xMax * y + x] == ' ') {
-			temp = fields + i;
-			temp->value = -1;
+		temp = fields + i;
+		if (exists(pLab, x, y) && isFree(pLab, x, y)) {
+			temp->value = -1; // Not evaluated
 			temp->x = x;
 			temp->y = y;
 		}
@@ -214,24 +216,28 @@ bool exists(Lab* pLab, int x, int y) {
 	return x > 0 && y > 0 && x < pLab->xMax && y < pLab->yMax;
 }
 
-bool isAvailable(Lab* pLab, int x, int y) {
-	return *(pLab->fields + pLab->xMax * y + x) == ' ';
+bool isFree(Lab* pLab, int x, int y) {
+	return getField(pLab, x, y) == ' ';
 }
 
 bool isGoal(Lab* pLab, int x, int y) {
-	return *(pLab->fields + pLab->xMax * y + x) == 'X';
+	return getField(pLab, x, y) == 'X';
 }
 
 void setVisited(Lab* pLab, int x, int y) {
-	*(pLab->fields + y * pLab->xMax + x) = '.';
+	setField(pLab, x, y, '.');
 }
 
 void setUnvisited(Lab* pLab, int x, int y) {
-	*(pLab->fields + y * pLab->xMax + x) = ' ';
+	setField(pLab, x, y, ' ');
 }
 
-void setChar(Lab* pLab, int x, int y, char value) {
+void setField(Lab* pLab, int x, int y, char value) {
 	*(pLab->fields + y * pLab->xMax + x) = value;
+}
+
+char getField(Lab* pLab, int x, int y) {
+	return pLab->fields[y * pLab->xMax + x];
 }
 
 void setEvaluated(Lab* pLab, int x, int y, int value) {
@@ -242,7 +248,7 @@ Field* isNextToGoal(Lab* pLab, Field* moves) {
 	Field* temp = NULL;
 	for (int i = 0; i < MOVE_SIZE; i++) {
 		temp = (moves + i);
-		if (isGoal(pLab, temp->x, temp->y)) {
+		if (temp && isGoal(pLab, temp->x, temp->y)) {
 			temp->value = 1;
 			return temp;
 		}
@@ -267,26 +273,24 @@ Field* cloneMove(Field* src) {
 }
 
 Field* greedy(Lab* pLab, int currX, int currY) {
-	Field *moves = getMoves(pLab, currX, currY), *temp = isNextToGoal(pLab,
-			moves), *nextTemp = NULL, *min = dummyMove();
+	Field *moves = getMoves(pLab, currX, currY), *temp = NULL, *nextTemp = NULL, *min = dummyMove();
 
 	setVisited(pLab, currX, currY);
+
 	usleep(DELAY);
 	if (NOISY) {
 		rewindOutputField();
 		printOutputField(pLab);
 	}
 
-	if (temp) {
-		min = cloneMove(temp);
-		free(moves);
-		return min;
-	}
-
 	for (int i = 0; i < MOVE_SIZE; i++) {
 		temp = (moves + i);
-		if (exists(pLab, temp->x, temp->y)
-				&& isAvailable(pLab, temp->x, temp->y)) {
+		if (temp) {
+			if (isGoal(pLab, temp->x, temp->y)) {
+				min = cloneMove(temp);
+				free(moves);
+				return min;
+			}
 			nextTemp = greedy(pLab, temp->x, temp->y);
 			if (nextTemp && nextTemp->value < min->value) {
 				temp->value = nextTemp->value;
@@ -297,45 +301,50 @@ Field* greedy(Lab* pLab, int currX, int currY) {
 	}
 
 	Field* clone = cloneMove(min);
-	setChar(pLab, clone->x, clone->y, '+');
+	setField(pLab, clone->x, clone->y, '+');
 	clone->value++;
 	free(moves);
 	return clone;
 }
 
-Field* escape(Lab* pLab, int currX, int currY) {
-	Field* moves = getMoves(pLab, currX, currY);
-	Field* temp = isNextToGoal(pLab, moves);
-
-	setVisited(pLab, currX, currY);
-	usleep(DELAY);
-	if (NOISY) {
-		rewindOutputField();
-		printOutputField(pLab);
-	}
-
-	if (temp)
-		return temp;
+int escape(Lab* pLab, int currX, int currY) {
+	int xShift[] = { 0, -1, 1, 0 };
+	int yShift[] = { -1, 0, 0, 1 };
+	int x, y;
 
 	for (int i = 0; i < MOVE_SIZE; i++) {
-		temp = (moves + i);
-		if (exists(pLab, temp->x, temp->y)
-				&& isAvailable(pLab, temp->x, temp->y)) {
-			if (escape(pLab, temp->x, temp->y)) {
-				return temp;
+		x = currX + xShift[i];
+		y = currY + yShift[i];
+		if (exists(pLab, x, y)) {
+			if (isGoal(pLab, x, y)) {
+				return 1;
+			} else if (isFree(pLab, x, y)) {
+				// Update the UI
+				setVisited(pLab, x, y);
+				usleep(DELAY);
+				if (NOISY) {
+					rewindOutputField();
+					printOutputField(pLab);
+				}
+				if (escape(pLab, x, y)) {
+					return 1;
+				}
 			}
 		}
 	}
-	free(moves);
+
 	return 0;
 }
 
 int bfs(Lab* pLab, Field* startField) {
-	QueueElement *start = malloc(sizeof(QueueElement)), *temp_q = NULL,
-			*temp_q_next = NULL;
+	QueueElement *start = malloc(sizeof(QueueElement)), *temp_q = NULL, *temp_q_next = NULL;
+	Field *temp_m = NULL, *temp_m_next = NULL;
+	int xShift[] = { 0, -1, 1, 0 };
+	int yShift[] = { -1, 0, 0, 1 };
+	int x, y;
+
 	first_q = NULL;
 	last_q = NULL;
-	Field *temp_m = NULL, *temp_m_next = NULL;
 
 	startField->value = 0;
 	start->content = startField;
@@ -346,20 +355,18 @@ int bfs(Lab* pLab, Field* startField) {
 		temp_q = dequeue();
 		temp_m = temp_q->content;
 
+		// Update the UI
 		usleep(DELAY);
 		if (NOISY) {
 			rewindOutputField();
 			printOutputField(pLab);
 		}
 
-		int xShift[] = { 0, -1, 1, 0 };
-		int yShift[] = { -1, 0, 0, 1 };
-		int x, y;
 		for (int i = 0; i < MOVE_SIZE; i++) {
 			x = temp_m->x + xShift[i];
 			y = temp_m->y + yShift[i];
-			if (x > 0 && y > 0 && x < pLab->xMax && y < pLab->yMax) {
-				if (pLab->fields[y * pLab->xMax + x] == ' ') {
+			if (exists(pLab, x, y)) {
+				if (isFree(pLab, x, y)) {
 					temp_m_next = malloc(sizeof(Field));
 					temp_m_next->x = x;
 					temp_m_next->y = y;
@@ -369,7 +376,7 @@ int bfs(Lab* pLab, Field* startField) {
 					temp_q_next->behind = NULL;
 					temp_q_next->content = temp_m_next;
 					enqueue(temp_q_next);
-				} else if (pLab->fields[y * pLab->xMax + x] == 'X') {
+				} else if (isGoal(pLab, x, y)) {
 					return temp_m->value + 1;
 				}
 			}
@@ -381,10 +388,10 @@ int bfs(Lab* pLab, Field* startField) {
 	return 0;
 }
 
-Lab* LabSolve(Lab* pLab, int search) {
+int LabSolve(Lab* pLab, int search) {
 	Field* startField = getStartField(pLab), *result = NULL;
-	int result_i;
-	printf("Start field is %d|%d.\n", startField->x, startField->y);
+	int result_i = 0;
+	// printf("Start field is %d|%d.\n", startField->x, startField->y);
 	printf("Press enter to start solving...\n");
 	for (int y = 0; y < pLab->yMax; y++) {
 		for (int x = 0; x < pLab->xMax; x++) {
@@ -398,18 +405,20 @@ Lab* LabSolve(Lab* pLab, int search) {
 
 	switch (search) {
 	case 0: // Escape
-		result = escape(pLab, startField->x, startField->y);
-		if (result)
+		result_i = escape(pLab, startField->x, startField->y);
+		if (result_i)
 			printf("Solved.\n");
 		else
 			printf("Impossible.\n");
 		break;
 	case 1: // Greedy
 		result = greedy(pLab, startField->x, startField->y);
-		if (result)
-			printf("Solved. Good way is %d steps.\n", result->value);
-		else
+		if (result) {
+			result_i = result->value;
+			printf("Solved. Good way is %d steps.\n", result_i);
+		} else {
 			printf("Impossible.\n");
+		}
 		break;
 	case 2: // BFS
 		result_i = bfs(pLab, startField);
@@ -420,6 +429,6 @@ Lab* LabSolve(Lab* pLab, int search) {
 		break;
 	}
 	free(startField);
-	return pLab;
+	return result_i;
 }
 
