@@ -195,20 +195,20 @@ int main(int argc, char* argv[]) {
 }
 
 void printHelp(char* a) {
-	fprintf(stderr, "Usage: %s [<file>] [<search>] [<optionals>]"
+	fprintf(stderr, "Usage: %s [<file>] [<algorithm>] [<args>]"
 			"\nSearches:"
-			"\t\n-escape Just finds a path to escape"
-			"\t\n-greedy Finds mostly a good path"
-			"\t\n-bfs Finds best path via breadth first search"
+			"\t\n-escape Just finds a path to escape."
+			"\t\n-greedy Finds mostly a good path."
+			"\t\n-bfs Finds best path via breadth first search."
 			"\nOptionals:"
-			"\t\n-l Only use horizontal and vertical paths"
-			"\t\n-s Supress the console output"
-			"\t\n-t <nanoseconds> Delay in nanoseconds"
+			"\t\n-l Linear-only. Default is diagonally."
+			"\t\n-s Silent searching without unnessecary output. Default is not silent."
+			"\t\n-t <nanoseconds> Delay in nanoseconds. Accepts integer values. Default is 0."
 			"\n", a);
 }
 
 void enqueue(QueueElement* el) {
-// initial
+	// initial
 	if (!first_q) {
 		first_q = el;
 	} else {
@@ -220,7 +220,7 @@ void enqueue(QueueElement* el) {
 QueueElement* dequeue() {
 	QueueElement* one = first_q;
 	first_q = first_q->behind;
-
+	// only one or none remaining
 	if (!first_q || !first_q->behind) {
 		last_q = first_q;
 	}
@@ -356,7 +356,7 @@ Field* cloneMove(Field* src) {
 int greedy(Lab* pLab, int currX, int currY) {
 	int x, y, v, minV = INFINITY;
 
-// Update the UI
+	// Update the UI
 	setVisited(pLab, currX, currY);
 	usleep(delay);
 	if (!silent) {
@@ -462,7 +462,6 @@ int bfs(Lab* pLab, Field* startField) {
 int LabSolve(Lab* pLab, int search) {
 	Field* startField = getStartField(pLab);
 	int result_i = 0;
-// printf("Start field is %d|%d.\n", startField->x, startField->y);
 	if (!silent) {
 		printf("Press enter to start solving...\n");
 		for (int y = 0; y < pLab->yMax; y++) {
