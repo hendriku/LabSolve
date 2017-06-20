@@ -5,7 +5,6 @@
 #include <unistd.h>
 #define INFINITY 1000000000
 // For vertical and horizontal ONLY
-#define MOVE_SIZE 4
 
 typedef struct {
 	int x, y, value;
@@ -39,6 +38,12 @@ bool exists(Lab*, int, int);
 char getField(Lab*, int, int);
 void printHelp(char*);
 
+int move_size = 7;
+int xShift[] = { 0, -1, 1, 0 };
+int yShift[] = { -1, 0, 0, 1 };
+int xShift_diag[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
+int yShift_diag[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+int *p_xShift = xShift_diag, *p_yShift = yShift_diag;
 QueueElement *first_q, *last_q;
 bool silent = false;
 int delay = 0;
@@ -63,33 +68,113 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(argv[2], "-bfs")) {
 			search = 2;
 		} else {
-			printf("Unknown search %s", argv[2]);
+			printf("Unknown search %s\n", argv[2]);
+			printHelp(argv[0]);
 			return -1;
 		}
-		if (argc == 4) { // only silent
-			silent = !strcmp(argv[3], "-silent");
-		} else if (argc == 5) { // only delay
-			bool syntax = !strcmp(argv[3], "-delay");
+		if (argc == 4) { // silent OR linear
+			silent = !strcmp(argv[3], "-s");
+			if (!silent) {
+				if (!strcmp(argv[3], "-l")) {
+					move_size = 4;
+					p_xShift = xShift;
+					p_yShift = yShift;
+				} else {
+					printHelp(argv[0]);
+					return 1;
+				}
+			}
+		} else if (argc == 5) { //  (delay) OR (silent AND linear)
+			bool syntax = !strcmp(argv[3], "-t");
 			if (syntax) {
+				delay = atoi(argv[4]);
+			} else {
+				silent = !strcmp(argv[3], "-s") || !strcmp(argv[4], "-s");
+				if (!strcmp(argv[3], "-l") || !strcmp(argv[4], "-l")) {
+					move_size = 4;
+					p_xShift = xShift;
+					p_yShift = yShift;
+				} else {
+					printHelp(argv[0]);
+					return 1;
+				}
+			}
+		} else if (argc == 6) { // (silent OR linear) AND delay
+			if ((!strcmp(argv[3], "-s") || strcmp(argv[5], "-s")) && !strcmp(argv[4], "-t")) {
+				silent = true;
+				delay = atoi(argv[5]);
+			} else if ((!strcmp(argv[3], "-l") || !strcmp(argv[5], "-l")) && !strcmp(argv[3], "-t")) {
+				move_size = 4;
+				p_xShift = xShift;
+				p_yShift = yShift;
 				delay = atoi(argv[4]);
 			} else {
 				printHelp(argv[0]);
 				return 1;
 			}
-		} else if (argc == 6) { // silent AND delay
+		} else if (argc == 7) { // silent AND linear AND delay
 			silent = true;
-			if (!strcmp(argv[3], "-silent")) {
-				bool syntax = !strcmp(argv[4], "-delay");
-				if (syntax) {
-					delay = atoi(argv[5]);
+			move_size = 4;
+			p_xShift = xShift;
+			p_yShift = yShift;
+
+			if (!strcmp(argv[3], "-s")) {
+				if (!strcmp(argv[4], "-l")) {
+					if (!strcmp(argv[5], "-t")) {
+						delay = atoi(argv[6]);
+					} else {
+						printHelp(argv[0]);
+						return 1;
+					}
+				} else if (!strcmp(argv[6], "-l")) { // 5 not needed
+					if (!strcmp(argv[4], "-t")) {
+						delay = atoi(argv[5]);
+					} else {
+						printHelp(argv[0]);
+						return 1;
+					}
 				} else {
 					printHelp(argv[0]);
 					return 1;
 				}
-			} else if (!strcmp(argv[5], "-silent")) {
-				bool syntax = !strcmp(argv[3], "-delay");
-				if (syntax) {
+			} else if (!strcmp(argv[4], "-s")) {
+				if (!strcmp(argv[3], "-l")) {
+					if (!strcmp(argv[5], "-t")) {
+						delay = atoi(argv[6]);
+					} else {
+						printHelp(argv[0]);
+						return 1;
+					}
+				} else {
+					printHelp(argv[0]);
+					return 1;
+				}
+			} else if (!strcmp(argv[5], "-s")) {
+				if (!strcmp(argv[3], "-t")) {
 					delay = atoi(argv[4]);
+					if (strcmp(argv[6], "-l")) {
+						printHelp(argv[0]);
+						return 1;
+					}
+				} else {
+					printHelp(argv[0]);
+					return 1;
+				}
+			} else if (!strcmp(argv[6], "-s")) {
+				if (!strcmp(argv[3], "-l")) {
+					if (strcmp(argv[4], "-t")) {
+						delay = atoi(argv[5]);
+					} else {
+						printHelp(argv[0]);
+						return 1;
+					}
+				} else if (!strcmp(argv[5], "-l")) {
+					if (strcmp(argv[3], "-t")) {
+						delay = atoi(argv[4]);
+					} else {
+						printHelp(argv[0]);
+						return 1;
+					}
 				} else {
 					printHelp(argv[0]);
 					return 1;
@@ -110,18 +195,20 @@ int main(int argc, char* argv[]) {
 }
 
 void printHelp(char* a) {
-	fprintf(stderr, "Usage: %s [<file>] [<search>]"
+	fprintf(stderr, "Usage: %s [<file>] [<search>] [<optionals>]"
 			"\nSearches:"
 			"\t\n-escape Just finds a path to escape"
 			"\t\n-greedy Finds mostly a good path"
 			"\t\n-bfs Finds best path via breadth first search"
-			"\t\n-silent (Optional) Supress the console output"
-			"\t\n-delay <int> (Optional) delay"
+			"\nOptionals:"
+			"\t\n-l Only use horizontal and vertical paths"
+			"\t\n-s Supress the console output"
+			"\t\n-t <nanoseconds> Delay in nanoseconds"
 			"\n", a);
 }
 
 void enqueue(QueueElement* el) {
-	// initial
+// initial
 	if (!first_q) {
 		first_q = el;
 	} else {
@@ -198,11 +285,9 @@ Field* getStartField(Lab* pLab) {
 }
 
 Lab* LabRead(FILE* file) {
-	//printf("Reading lab...\n");
 	Lab* pLab = malloc(sizeof(Lab));
 	pLab->xMax = getLabWidth(file);
 	pLab->yMax = getLabHeight(file);
-	//printf("Dimensions are %d x %d.\n", pLab->xMax, pLab->yMax);
 	pLab->fields = malloc(sizeof(char) * pLab->xMax * pLab->yMax);
 	char temp;
 	int x = 0, y = 0;
@@ -269,11 +354,9 @@ Field* cloneMove(Field* src) {
 }
 
 int greedy(Lab* pLab, int currX, int currY) {
-	int xShift[] = { 0, -1, 1, 0 };
-	int yShift[] = { -1, 0, 0, 1 };
 	int x, y, v, minV = INFINITY;
 
-	// Update the UI
+// Update the UI
 	setVisited(pLab, currX, currY);
 	usleep(delay);
 	if (!silent) {
@@ -281,9 +364,9 @@ int greedy(Lab* pLab, int currX, int currY) {
 		printOutputField(pLab);
 	}
 
-	for (int i = 0; i < MOVE_SIZE; i++) {
-		x = currX + xShift[i];
-		y = currY + yShift[i];
+	for (int i = 0; i < move_size; i++) {
+		x = currX + p_xShift[i];
+		y = currY + p_yShift[i];
 		if (exists(pLab, x, y)) {
 			if (isGoal(pLab, x, y)) {
 				return 1;
@@ -296,18 +379,15 @@ int greedy(Lab* pLab, int currX, int currY) {
 		}
 	}
 
-	// setField(pLab, clone->x, clone->y, '+');
 	return minV + 1;
 }
 
 int escape(Lab* pLab, int currX, int currY) {
-	int xShift[] = { 0, -1, 1, 0 };
-	int yShift[] = { -1, 0, 0, 1 };
 	int x, y;
 
-	for (int i = 0; i < MOVE_SIZE; i++) {
-		x = currX + xShift[i];
-		y = currY + yShift[i];
+	for (int i = 0; i < move_size; i++) {
+		x = currX + p_xShift[i];
+		y = currY + p_yShift[i];
 		if (exists(pLab, x, y)) {
 			if (isGoal(pLab, x, y)) {
 				return 1;
@@ -332,8 +412,6 @@ int escape(Lab* pLab, int currX, int currY) {
 int bfs(Lab* pLab, Field* startField) {
 	QueueElement *start = malloc(sizeof(QueueElement)), *temp_q = NULL, *temp_q_next = NULL;
 	Field *temp_m = NULL, *temp_m_next = NULL;
-	int xShift[] = { 0, -1, 1, 0 };
-	int yShift[] = { -1, 0, 0, 1 };
 	int x, y;
 
 	first_q = NULL;
@@ -355,9 +433,9 @@ int bfs(Lab* pLab, Field* startField) {
 			printOutputField(pLab);
 		}
 
-		for (int i = 0; i < MOVE_SIZE; i++) {
-			x = temp_m->x + xShift[i];
-			y = temp_m->y + yShift[i];
+		for (int i = 0; i < move_size; i++) {
+			x = temp_m->x + p_xShift[i];
+			y = temp_m->y + p_yShift[i];
 			if (exists(pLab, x, y)) {
 				if (isFree(pLab, x, y)) {
 					temp_m_next = malloc(sizeof(Field));
@@ -384,7 +462,7 @@ int bfs(Lab* pLab, Field* startField) {
 int LabSolve(Lab* pLab, int search) {
 	Field* startField = getStartField(pLab);
 	int result_i = 0;
-	// printf("Start field is %d|%d.\n", startField->x, startField->y);
+// printf("Start field is %d|%d.\n", startField->x, startField->y);
 	if (!silent) {
 		printf("Press enter to start solving...\n");
 		for (int y = 0; y < pLab->yMax; y++) {
