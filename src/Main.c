@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <unistd.h>
 #define INFINITY 1000000000
-#define DELAY 0
 // For vertical and horizontal ONLY
 #define MOVE_SIZE 4
 
@@ -38,21 +37,18 @@ void setField(Lab*, int, int, char);
 bool isFree(Lab*, int, int);
 bool exists(Lab*, int, int);
 char getField(Lab*, int, int);
+void printHelp(char*);
 
 QueueElement *first_q, *last_q;
-bool silent;
+bool silent = false;
+int delay = 0;
 
 int main(int argc, char* argv[]) {
 	FILE* in = stdin;
 	Lab* pLab = NULL;
 	int search, result;
 	if (argc < 3) {
-		fprintf(stderr, "Usage: %s [<file>] [<search>]"
-				"\nSearches:"
-				"\t\n-escape Just finds a path to escape"
-				"\t\n-greedy Finds mostly a good path"
-				"\t\n-bfs Finds best path via breadth first search"
-				"\t\n-silent (Optional) Supress the console output \n", argv[0]);
+		printHelp(argv[0]);
 		return 1;
 	} else {
 		in = fopen(argv[1], "r");
@@ -70,8 +66,38 @@ int main(int argc, char* argv[]) {
 			printf("Unknown search %s", argv[2]);
 			return -1;
 		}
-		if (argc > 3) {
+		if (argc == 4) { // only silent
 			silent = !strcmp(argv[3], "-silent");
+		} else if (argc == 5) { // only delay
+			bool syntax = !strcmp(argv[3], "-delay");
+			if (syntax) {
+				delay = atoi(argv[4]);
+			} else {
+				printHelp(argv[0]);
+				return 1;
+			}
+		} else if (argc == 6) { // silent AND delay
+			silent = true;
+			if (!strcmp(argv[3], "-silent")) {
+				bool syntax = !strcmp(argv[4], "-delay");
+				if (syntax) {
+					delay = atoi(argv[5]);
+				} else {
+					printHelp(argv[0]);
+					return 1;
+				}
+			} else if (!strcmp(argv[5], "-silent")) {
+				bool syntax = !strcmp(argv[3], "-delay");
+				if (syntax) {
+					delay = atoi(argv[4]);
+				} else {
+					printHelp(argv[0]);
+					return 1;
+				}
+			} else {
+				printHelp(argv[0]);
+				return 1;
+			}
 		}
 	}
 	pLab = LabRead(in);
@@ -81,6 +107,17 @@ int main(int argc, char* argv[]) {
 	free(pLab->fields);
 	fclose(in);
 	return result;
+}
+
+void printHelp(char* a) {
+	fprintf(stderr, "Usage: %s [<file>] [<search>]"
+			"\nSearches:"
+			"\t\n-escape Just finds a path to escape"
+			"\t\n-greedy Finds mostly a good path"
+			"\t\n-bfs Finds best path via breadth first search"
+			"\t\n-silent (Optional) Supress the console output"
+			"\t\n-delay <int> (Optional) delay"
+			"\n", a);
 }
 
 void enqueue(QueueElement* el) {
@@ -238,7 +275,7 @@ int greedy(Lab* pLab, int currX, int currY) {
 
 	// Update the UI
 	setVisited(pLab, currX, currY);
-	usleep(DELAY);
+	usleep(delay);
 	if (!silent) {
 		rewindOutputField();
 		printOutputField(pLab);
@@ -277,7 +314,7 @@ int escape(Lab* pLab, int currX, int currY) {
 			} else if (isFree(pLab, x, y)) {
 				// Update the UI
 				setVisited(pLab, x, y);
-				usleep(DELAY);
+				usleep(delay);
 				if (!silent) {
 					rewindOutputField();
 					printOutputField(pLab);
@@ -312,7 +349,7 @@ int bfs(Lab* pLab, Field* startField) {
 		temp_m = temp_q->content;
 
 		// Update the UI
-		usleep(DELAY);
+		usleep(delay);
 		if (!silent) {
 			rewindOutputField();
 			printOutputField(pLab);
