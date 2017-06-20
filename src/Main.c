@@ -4,10 +4,9 @@
 #include <stdbool.h>
 #include <unistd.h>
 #define INFINITY 1000000000
-#define DELAY 1000
+#define DELAY 0
 // For vertical and horizontal ONLY
 #define MOVE_SIZE 4
-#define NOISY true
 
 typedef struct {
 	int x, y, value;
@@ -41,17 +40,19 @@ bool exists(Lab*, int, int);
 char getField(Lab*, int, int);
 
 QueueElement *first_q, *last_q;
+bool silent;
 
 int main(int argc, char* argv[]) {
 	FILE* in = stdin;
 	Lab* pLab = NULL;
 	int search, result;
-	if (argc != 3) {
+	if (argc < 3) {
 		fprintf(stderr, "Usage: %s [<file>] [<search>]"
 				"\nSearches:"
 				"\t\n-escape Just finds a path to escape"
 				"\t\n-greedy Finds mostly a good path"
-				"\t\n-bfs Finds best path via breadth first search\n", argv[0]);
+				"\t\n-bfs Finds best path via breadth first search"
+				"\t\n-silent (Optional) Supress the console output \n", argv[0]);
 		return 1;
 	} else {
 		in = fopen(argv[1], "r");
@@ -59,7 +60,6 @@ int main(int argc, char* argv[]) {
 			perror(argv[1]);
 			return -1;
 		}
-
 		if (!strcmp(argv[2], "-escape")) {
 			search = 0;
 		} else if (!strcmp(argv[2], "-greedy")) {
@@ -69,6 +69,9 @@ int main(int argc, char* argv[]) {
 		} else {
 			printf("Unknown search %s", argv[2]);
 			return -1;
+		}
+		if (argc > 3) {
+			silent = !strcmp(argv[3], "-silent");
 		}
 	}
 	pLab = LabRead(in);
@@ -236,7 +239,7 @@ int greedy(Lab* pLab, int currX, int currY) {
 	// Update the UI
 	setVisited(pLab, currX, currY);
 	usleep(DELAY);
-	if (NOISY) {
+	if (!silent) {
 		rewindOutputField();
 		printOutputField(pLab);
 	}
@@ -275,7 +278,7 @@ int escape(Lab* pLab, int currX, int currY) {
 				// Update the UI
 				setVisited(pLab, x, y);
 				usleep(DELAY);
-				if (NOISY) {
+				if (!silent) {
 					rewindOutputField();
 					printOutputField(pLab);
 				}
@@ -310,7 +313,7 @@ int bfs(Lab* pLab, Field* startField) {
 
 		// Update the UI
 		usleep(DELAY);
-		if (NOISY) {
+		if (!silent) {
 			rewindOutputField();
 			printOutputField(pLab);
 		}
@@ -345,17 +348,18 @@ int LabSolve(Lab* pLab, int search) {
 	Field* startField = getStartField(pLab);
 	int result_i = 0;
 	// printf("Start field is %d|%d.\n", startField->x, startField->y);
-	printf("Press enter to start solving...\n");
-	for (int y = 0; y < pLab->yMax; y++) {
-		for (int x = 0; x < pLab->xMax; x++) {
-			printf("%c", *(pLab->fields + y * pLab->xMax + x));
+	if (!silent) {
+		printf("Press enter to start solving...\n");
+		for (int y = 0; y < pLab->yMax; y++) {
+			for (int x = 0; x < pLab->xMax; x++) {
+				printf("%c", getField(pLab, x, y));
+			}
+			printf("\n");
 		}
+		while (getchar() != '\n')
+			;
 		printf("\n");
 	}
-	while (getchar() != '\n')
-		;
-	printf("\n");
-
 	switch (search) {
 	case 0: // Escape
 		result_i = escape(pLab, startField->x, startField->y);
