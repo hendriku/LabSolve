@@ -100,10 +100,18 @@ int main(int argc, char* argv[]) {
 				}
 			}
 		} else if (argc == 6) { // (silent OR linear) AND delay
-			if ((!strcmp(argv[3], "-s") || strcmp(argv[5], "-s")) && !strcmp(argv[4], "-t")) {
+			if (!strcmp(argv[3], "-s") && !strcmp(argv[4], "-t")) {
 				silent = true;
 				delay = atoi(argv[5]);
-			} else if ((!strcmp(argv[3], "-l") || !strcmp(argv[5], "-l")) && !strcmp(argv[3], "-t")) {
+			} else if (!strcmp(argv[5], "-s") && !strcmp(argv[3], "-t")) {
+				silent = true;
+				delay = atoi(argv[4]);
+			} else if (!strcmp(argv[3], "-l") && !strcmp(argv[4], "-t")) {
+				move_size = 4;
+				p_xShift = xShift;
+				p_yShift = yShift;
+				delay = atoi(argv[5]);
+			} else if (!strcmp(argv[5], "-l") && !strcmp(argv[3], "-t")) {
 				move_size = 4;
 				p_xShift = xShift;
 				p_yShift = yShift;
@@ -208,7 +216,7 @@ void printHelp(char* a) {
 }
 
 void enqueue(QueueElement* el) {
-	// initial
+// initial
 	if (!first_q) {
 		first_q = el;
 	} else {
@@ -220,7 +228,7 @@ void enqueue(QueueElement* el) {
 QueueElement* dequeue() {
 	QueueElement* one = first_q;
 	first_q = first_q->behind;
-	// only one or none remaining
+// only one or none remaining
 	if (!first_q || !first_q->behind) {
 		last_q = first_q;
 	}
@@ -356,7 +364,7 @@ Field* cloneMove(Field* src) {
 int greedy(Lab* pLab, int currX, int currY) {
 	int x, y, v, minV = INFINITY;
 
-	// Update the UI
+// Update the UI
 	setVisited(pLab, currX, currY);
 	usleep(delay);
 	if (!silent) {
@@ -426,7 +434,7 @@ int bfs(Lab* pLab, Field* startField) {
 		temp_q = dequeue();
 		temp_m = temp_q->content;
 
-		// Update the UI
+// Update the UI
 		usleep(delay);
 		if (!silent) {
 			rewindOutputField();
