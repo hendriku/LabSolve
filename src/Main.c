@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <unistd.h>
 #define INFINITY 1000000000
-// For vertical and horizontal ONLY
 
 typedef struct {
 	int x, y, value;
@@ -38,13 +37,13 @@ bool exists(Lab*, int, int);
 char getField(Lab*, int, int);
 void printHelp(char*);
 
-int move_size = 7;
+int move_size = 8;
 int xShift[] = { 0, -1, 1, 0 };
 int yShift[] = { -1, 0, 0, 1 };
 int xShift_diag[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 int yShift_diag[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
 int *p_xShift = xShift_diag, *p_yShift = yShift_diag;
-QueueElement *first_q, *last_q;
+QueueElement *first_q = NULL, *last_q = NULL;
 bool silent = false;
 int delay = 0;
 
@@ -281,7 +280,7 @@ Field* getStartField(Lab* pLab) {
 	Field* field = malloc(sizeof(Field));
 	for (int y = 0; y < pLab->yMax; y++) {
 		for (int x = 0; x < pLab->xMax; x++) {
-			if (*(pLab->fields + y * pLab->xMax + x) == 'S') {
+			if (pLab->fields[y * pLab->xMax + x] == 'S') {
 				field->x = x;
 				field->y = y;
 				return field;
@@ -396,6 +395,8 @@ int escape(Lab* pLab, int currX, int currY) {
 	for (int i = 0; i < move_size; i++) {
 		x = currX + p_xShift[i];
 		y = currY + p_yShift[i];
+
+
 		if (exists(pLab, x, y)) {
 			if (isGoal(pLab, x, y)) {
 				return 1;
@@ -421,9 +422,6 @@ int bfs(Lab* pLab, Field* startField) {
 	QueueElement *start = malloc(sizeof(QueueElement)), *temp_q = NULL, *temp_q_next = NULL;
 	Field *temp_m = NULL, *temp_m_next = NULL;
 	int x, y;
-
-	first_q = NULL;
-	last_q = NULL;
 
 	startField->value = 0;
 	start->content = startField;
@@ -456,6 +454,7 @@ int bfs(Lab* pLab, Field* startField) {
 					temp_q_next->content = temp_m_next;
 					enqueue(temp_q_next);
 				} else if (isGoal(pLab, x, y)) {
+					// TODO Free temp_q?
 					return temp_m->value + 1;
 				}
 			}
@@ -470,6 +469,7 @@ int bfs(Lab* pLab, Field* startField) {
 int LabSolve(Lab* pLab, int search) {
 	Field* startField = getStartField(pLab);
 	int result_i = 0;
+
 	if (!silent) {
 		printf("Press enter to start solving...\n");
 		for (int y = 0; y < pLab->yMax; y++) {
@@ -482,29 +482,30 @@ int LabSolve(Lab* pLab, int search) {
 			;
 		printf("\n");
 	}
+
 	switch (search) {
-	case 0: // Escape
-		result_i = escape(pLab, startField->x, startField->y);
-		if (result_i)
-			printf("Solved.\n");
-		else
-			printf("Impossible.\n");
-		break;
-	case 1: // Greedy
-		result_i = greedy(pLab, startField->x, startField->y);
-		if (result_i < INFINITY) {
-			printf("Solved. Good way is %d steps.\n", result_i);
-		} else {
-			printf("Impossible.\n");
-		}
-		break;
-	case 2: // BFS
-		result_i = bfs(pLab, startField);
-		if (result_i)
-			printf("Solved. Best way is %d steps.\n", result_i);
-		else
-			printf("Impossible.\n");
-		break;
+		case 0: // Escape
+			result_i = escape(pLab, startField->x, startField->y);
+			if (result_i)
+				printf("Solved.\n");
+			else
+				printf("Impossible.\n");
+			break;
+		case 1: // Greedy
+			result_i = greedy(pLab, startField->x, startField->y);
+			if (result_i < INFINITY) {
+				printf("Solved. Good way is %d steps.\n", result_i);
+			} else {
+				printf("Impossible.\n");
+			}
+			break;
+		case 2: // BFS
+			result_i = bfs(pLab, startField);
+			if (result_i)
+				printf("Solved. Best way is %d steps.\n", result_i);
+			else
+				printf("Impossible.\n");
+			break;
 	}
 	free(startField);
 	return result_i;
