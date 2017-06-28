@@ -261,7 +261,7 @@ int getLabHeight(FILE* pFile) {
 }
 
 void rewindOutputField() {
-	printf("\033[2;1H");
+	printf("\033[1;1H");
 }
 
 void printOutputField(Lab* pLab) {
