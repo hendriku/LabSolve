@@ -14,8 +14,8 @@ You can always use the mazes from the ./labs folder in the repository.
 
 ## Algorithms
 - **-escape** Just finds a way out via depth first search.
-- **-greedy** Takes the closest looking way step by step, returns NOT the shortest path
-- **-bfs** Breadth First Search, Classical shortest path algorithm with lowest complexity
+- **-greedy** Takes the closest looking way step by step, returns NOT the shortest path.
+- **-bfs** Breadth First Search, Classical shortest path algorithm with lowest complexity.
 
 ## Arguments
 - **-s** Silent searching without unnessecary output. Default is not silent.

@@ -48,6 +48,7 @@ bool silent = false;
 int delay = 0;
 
 int main(int argc, char* argv[]) {
+	system("clear");
 	FILE* in = stdin;
 	Lab* pLab = NULL;
 	int search, result;
@@ -239,6 +240,7 @@ int getLabWidth(FILE* pFile) {
 	char temp;
 	while ((temp = fgetc(pFile)) != EOF) {
 		if (temp == '\n') {
+			rewind(pFile);
 			return x;
 		} else {
 			x++;
