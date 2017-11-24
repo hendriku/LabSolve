@@ -1,5 +1,5 @@
 # LabSolve
-A program to solve labyrinths. It provides three solution algorithms and various settings for arguments.
+A command line tool to solve labyrinths alias mazes. It provides three solution algorithms and various settings for arguments.
 
 ## Usage
 ```LabSolve [<filename>] [<algorithm>] [<args>]```
