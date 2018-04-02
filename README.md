@@ -1,7 +1,7 @@
 # LabSolve
 A command line tool to solve labyrinths alias mazes. It provides three solution algorithms and various settings for arguments.
 
-![](https://pro2-bar-s3-cdn-cf4.myportfolio.com/bc79fb8be162f197fa31d84cd4c54f91/fc779b13-fd71-4f45-aea4-6ebe636cfddb_rw_1920.gif?h=26999b8c78eeba4c517ce1c10cecbcdb)
+![ezgif-1-e5960a83bf](https://user-images.githubusercontent.com/8998518/38201188-a1efb9fc-3697-11e8-8cd2-040b371f2d33.gif)
 
 ## Usage
 ```LabSolve [<filename>] [<algorithm>] [<args>]```
